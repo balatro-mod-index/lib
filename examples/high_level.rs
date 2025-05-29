@@ -1,4 +1,4 @@
-// cargo run --example high_level --features reqwest
+// RUST_LOG=debug cargo run --example high_level --features reqwest
 
 use bmm_index::{github::GitHubTree, lfs, r#mod::from_reqwest};
 

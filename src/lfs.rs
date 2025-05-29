@@ -154,7 +154,7 @@ pub async fn batch_download(
 
     Ok(stream::iter(download_urls)
         .map(|(oid, url)| async move { (oid, client.get(url).send().await) })
-        .buffered(concurrent_requests)
+        .buffer_unordered(concurrent_requests)
         .filter_map(|(oid, req)| async move {
             if let Ok(req) = req {
                 log::debug!("downloading lfs object `{oid}`");
