@@ -124,6 +124,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "balatro_mod_index"
+version = "0.0.0"
+dependencies = [
+ "bytes",
+ "env_logger",
+ "futures",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "zip",
+]
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -142,21 +157,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array",
-]
-
-[[package]]
-name = "bmm_index"
-version = "0.0.0"
-dependencies = [
- "bytes",
- "env_logger",
- "futures",
- "log",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "zip",
 ]
 
 [[package]]

@@ -8,8 +8,8 @@ impl Default for Tree<'_> {
     fn default() -> Self {
         Tree {
             hostname: "github.com",
-            namespace: "kasimeka",
-            name: "bmm-index-ng",
+            namespace: "balatro-mod-index",
+            name: "repo",
             rev: "main",
         }
     }

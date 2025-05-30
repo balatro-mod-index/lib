@@ -1,6 +1,6 @@
 // cargo run --example high_level --features reqwest
 
-use bmm_index::{github::Tree, lfs, mods};
+use balatro_mod_index::{github::Tree, lfs, mods};
 
 use env_logger::Env;
 
@@ -15,8 +15,8 @@ async fn main() -> Result<(), String> {
     let reqwest = reqwest::Client::new();
     let index_repo = Tree {
         hostname: "github.com",
-        namespace: "kasimeka",
-        name: "bmm-index-ng",
+        namespace: "balatro-mod-index",
+        name: "repo",
         rev: "main",
     }; // the exact same as `Tree::default()`
 
