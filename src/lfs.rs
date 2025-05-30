@@ -80,7 +80,7 @@ impl BatchPointers for &Vec<&Pointer> {
         let count = min(count, self.len() - offset);
         Ok((
             self.iter().skip(offset).take(count).copied().collect(),
-            offset + count + 1,
+            offset + count,
         ))
     }
 }

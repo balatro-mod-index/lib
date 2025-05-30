@@ -58,7 +58,7 @@ impl ModIndex<'_> {
             }
         }
 
-        Ok((pointers, offset + count + 1))
+        Ok((pointers, offset + count))
     }
 }
 
