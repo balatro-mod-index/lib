@@ -20,16 +20,13 @@ async fn main() -> Result<(), String> {
     mods.sort_by(|(_, a), (_, b)| a.meta.title.cmp(&b.meta.title));
     mods.sort_by(|(_, a), (_, b)| b.meta.last_updated.cmp(&a.meta.last_updated));
 
-    let mods_with_thumbs = mods.iter().filter(|(_, m)| m.thumbnail.is_some());
-    let thumb_pointers = mods_with_thumbs
-        .map(|(_, m)| m.thumbnail.as_ref().unwrap())
-        .take(EXAMPLE_COUNT)
-        .collect::<Vec<_>>();
-
+    let (thumb_pointers, _next) = index
+        .batch_lfs_on(|m| m.thumbnail.as_ref(), 0, EXAMPLE_COUNT)
+        .map_err(|e| e.to_string())?;
     let thumbs =
         lfs::batch_download(&thumb_pointers, &reqwest, &tree, CONCURRENT_REQUESTS, false).await?;
 
-    for (id, m) in mods.iter().take(EXAMPLE_COUNT) {
+    for (id, m) in index.mods.iter().take(EXAMPLE_COUNT) {
         if let Some(p) = &m.thumbnail {
             println!(
                 "mod `{}`, last updated on {} has thumbnail of size {}",
