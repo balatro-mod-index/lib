@@ -19,7 +19,7 @@ impl Clone for ModId {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Mod {
     pub meta: ModMeta,
     pub description: Option<String>,
@@ -62,7 +62,7 @@ impl ModIndex<'_> {
     }
 }
 
-#[derive(Debug, Default, serde::Deserialize)]
+#[derive(Clone, Debug, Default, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ModMeta {
     pub requires_steamodded: bool,
