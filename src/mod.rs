@@ -13,6 +13,11 @@ impl fmt::Display for ModId {
         write!(f, "{}", self.0)
     }
 }
+impl Clone for ModId {
+    fn clone(&self) -> Self {
+        ModId(self.0.clone())
+    }
+}
 
 #[derive(Default, Debug)]
 pub struct Mod {
