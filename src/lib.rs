@@ -1,5 +1,5 @@
 pub mod github;
-pub mod r#mod;
+pub mod mods;
 
 #[cfg(feature = "lfs")]
 pub mod lfs;

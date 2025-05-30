@@ -1,12 +1,12 @@
-pub struct GitHubTree<'a> {
+pub struct Tree<'a> {
     pub hostname: &'a str,
     pub namespace: &'a str,
     pub name: &'a str,
     pub rev: &'a str,
 }
-impl Default for GitHubTree<'_> {
+impl Default for Tree<'_> {
     fn default() -> Self {
-        GitHubTree {
+        Tree {
             hostname: "github.com",
             namespace: "kasimeka",
             name: "bmm-index-ng",

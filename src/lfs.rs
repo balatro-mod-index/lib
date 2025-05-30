@@ -90,7 +90,7 @@ impl BatchPointers for &Vec<&Pointer> {
 pub async fn batch_download(
     pointers: &Vec<&Pointer>,
     client: &reqwest::Client,
-    tree: &super::github::GitHubTree<'_>,
+    tree: &super::github::Tree<'_>,
     concurrent_requests: usize,
     _authenticated: bool,
 ) -> Result<std::collections::HashMap<String, bytes::Bytes>, String> {

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::github::GitHubTree;
+use crate::github::Tree;
 #[cfg(feature = "lfs")]
 use crate::lfs;
 #[cfg(feature = "zip")]
@@ -29,7 +29,7 @@ pub struct Mod {
 
 pub struct ModIndex<'a> {
     pub mods: Vec<(ModId, Mod)>,
-    pub repo: &'a GitHubTree<'a>,
+    pub repo: &'a Tree<'a>,
 }
 
 #[cfg(feature = "lfs")]
@@ -98,7 +98,7 @@ impl std::str::FromStr for ModMeta {
 impl ModIndex<'_> {
     pub fn from_zip<'a, R: std::io::Read + std::io::Seek>(
         zip: &mut ZipArchive<R>,
-        source_spec: &'a GitHubTree,
+        source_spec: &'a Tree,
     ) -> Result<ModIndex<'a>, String> {
         use std::{collections::HashMap, io::Read};
 
@@ -149,7 +149,7 @@ impl ModIndex<'_> {
 #[allow(clippy::missing_errors_doc)]
 pub async fn from_reqwest<'a>(
     reqwest: &reqwest::Client,
-    source_spec: &'a GitHubTree<'a>,
+    source_spec: &'a Tree<'a>,
 ) -> Result<ModIndex<'a>, String> {
     let url = format!(
         "https://{}/{}/{}/archive/refs/heads/{}.zip",

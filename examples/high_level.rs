@@ -1,6 +1,6 @@
 // RUST_LOG=debug cargo run --example high_level --features reqwest
 
-use bmm_index::{github::GitHubTree, lfs, r#mod::from_reqwest};
+use bmm_index::{github::Tree, lfs, mods};
 
 use env_logger::Env;
 
@@ -13,9 +13,9 @@ async fn main() -> Result<(), String> {
     env_logger::Builder::from_env(Env::new().default_filter_or("info")).init();
 
     let reqwest = reqwest::Client::new();
-    let tree = GitHubTree::default();
+    let tree = Tree::default();
 
-    let mut index = from_reqwest(&reqwest, &tree).await?;
+    let mut index = mods::from_reqwest(&reqwest, &tree).await?;
     let mods = &mut index.mods;
     mods.sort_by(|(_, a), (_, b)| a.meta.title.cmp(&b.meta.title));
     mods.sort_by(|(_, a), (_, b)| b.meta.last_updated.cmp(&a.meta.last_updated));
