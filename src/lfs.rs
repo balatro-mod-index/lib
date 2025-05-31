@@ -291,8 +291,8 @@ async fn concurrent_download_impl<'a, F, Fut>(
     concurrency_factor: usize,
 ) -> Result<HashMap<&'a String, bytes::Bytes>, String>
 where
-    F: Fn(&'a reqwest::Client, &'a String, &'a str) -> Fut, // Now returns Fut directly
-    Fut: Future<Output = Result<bytes::Bytes, String>> + Send + 'a, // Fut is the concrete future type
+    F: Fn(&'a reqwest::Client, &'a String, &'a str) -> Fut,
+    Fut: Future<Output = Result<bytes::Bytes, String>> + Send + 'a,
 {
     use futures::{StreamExt, stream};
 

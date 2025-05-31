@@ -25,7 +25,7 @@ async fn main() -> Result<(), String> {
 
     for (mod_id, mod_data) in index.mods.iter().take(PAGE_SIZE) {
         log::info!(
-            "{mod_id}: has thumbnail of size {}",
+            "{mod_id}: has {}",
             mod_data
                 .thumbnail
                 .as_ref()
