@@ -190,7 +190,11 @@ pub async fn mut_fetch_blobs(
     use futures::{StreamExt, stream};
     use std::cmp::min;
 
-    let pointers = blobs.iter().map(|b| &b.pointer).collect::<Vec<_>>();
+    let pointers = blobs
+        .iter()
+        .filter(|b| b.data.is_none())
+        .map(|b| &b.pointer)
+        .collect::<Vec<_>>();
     let mut download_urls = Vec::new();
 
     let mut offset = 0;
