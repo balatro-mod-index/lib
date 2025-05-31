@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tree<'a> {
     pub hostname: &'a str,
     pub namespace: &'a str,

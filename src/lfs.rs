@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 #[derive(Default, Debug, Clone, serde::Serialize)]
 pub struct Pointer {
     pub oid: String,
@@ -87,17 +89,11 @@ impl BatchPointers for &Vec<&Pointer> {
 
 #[cfg(feature = "reqwest")]
 #[allow(clippy::missing_errors_doc)]
-pub async fn batch_download(
+pub async fn batch_query_objects(
     pointers: &Vec<&Pointer>,
     client: &reqwest::Client,
     tree: &super::github::Tree<'_>,
-    concurrent_requests: usize,
-    _authenticated: bool,
-) -> Result<std::collections::HashMap<String, bytes::Bytes>, String> {
-    use std::collections::HashMap;
-
-    use futures::{StreamExt, stream};
-
+) -> Result<Vec<(String, String)>, String> {
     let mut download_urls = Vec::new();
     let mut offset = 0;
     loop {
@@ -152,23 +148,76 @@ pub async fn batch_download(
         );
     }
 
-    Ok(stream::iter(download_urls)
-        .map(|(oid, url)| async move { (oid, client.get(url).send().await) })
-        .buffer_unordered(concurrent_requests)
-        .filter_map(|(oid, req)| async move {
-            if let Ok(req) = req {
-                log::debug!("downloading lfs object `{oid}`");
-                Some((
-                    oid,
-                    req.bytes()
-                        .await
-                        .map_err(|e| format!("couldn't read response: {e}"))
-                        .ok()?,
-                ))
-            } else {
-                None
-            }
+    Ok(download_urls)
+}
+
+#[cfg(feature = "reqwest")]
+#[cached::proc_macro::cached(
+    result = true,
+    ty = "cached::SizedCache<String, bytes::Bytes>",
+    create = "{ cached::SizedCache::with_size(100) }",
+    convert = r#"{ format!("{}", oid) }"#
+)]
+pub async fn fetch_one(
+    client: &reqwest::Client,
+    url: &String,
+    #[allow(unused_variables)] oid: &str, // our cache key
+) -> Result<bytes::Bytes, String> {
+    log::debug!("fetching blob at {url}");
+    client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("couldn't fetch blob at {url}: {e}"))?
+        .bytes()
+        .await
+        .map_err(|e| format!("couldn't get response body {url}: {e}"))
+}
+
+#[cfg(feature = "reqwest")]
+use std::collections::HashMap;
+
+#[cfg(feature = "reqwest")]
+#[allow(clippy::missing_errors_doc)]
+pub async fn memoized_concurrent_download<'a>(
+    urls: &'a Vec<(&'a String, &'a String)>,
+    client: &'a reqwest::Client,
+    concurrency_factor: usize,
+) -> Result<HashMap<&'a String, bytes::Bytes>, String> {
+    concurrent_download_impl(fetch_one, urls, client, concurrency_factor).await
+}
+#[cfg(feature = "reqwest")]
+#[allow(clippy::missing_errors_doc)]
+pub async fn concurrent_download<'a>(
+    urls: &'a Vec<(&'a String, &'a String)>,
+    client: &'a reqwest::Client,
+    concurrency_factor: usize,
+) -> Result<HashMap<&'a String, bytes::Bytes>, String> {
+    concurrent_download_impl(fetch_one_no_cache, urls, client, concurrency_factor).await
+}
+
+#[cfg(feature = "reqwest")]
+#[allow(clippy::missing_errors_doc)]
+async fn concurrent_download_impl<'a, F, Fut>(
+    fetch_fn: F,
+    urls: &'a Vec<(&'a String, &'a String)>,
+    client: &'a reqwest::Client,
+    concurrency_factor: usize,
+) -> Result<HashMap<&'a String, bytes::Bytes>, String>
+where
+    F: Fn(&'a reqwest::Client, &'a String, &'a str) -> Fut, // Now returns Fut directly
+    Fut: Future<Output = Result<bytes::Bytes, String>> + Send + 'a, // Fut is the concrete future type
+{
+    use futures::{StreamExt, stream};
+
+    let buffer_unordered = stream::iter(urls)
+        .map(|(oid, url)| {
+            let fetch_fn = &fetch_fn;
+            async move { (*oid, fetch_fn(client, url, oid).await) }
         })
+        .buffer_unordered(concurrency_factor);
+    Ok(buffer_unordered
+        .filter_map(|(oid, req)| async move { req.ok().map(|bytes| (oid, bytes)) })
         .collect::<HashMap<_, _>>()
         .await)
 }
