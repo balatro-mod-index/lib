@@ -100,7 +100,7 @@ pub async fn batch_query_objects(
     client: &reqwest::Client,
     tree: &super::github::Tree<'_>,
 ) -> Result<Vec<(String, String)>, String> {
-    let mut download_urls = Vec::new();
+    let mut download_urls = Vec::with_capacity(pointers.len());
     let mut offset = 0;
     loop {
         log::debug!("getting lfs object info at offset {offset}");
@@ -195,7 +195,7 @@ pub async fn mut_fetch_blobs(
         .filter(|b| b.data.is_none())
         .map(|b| &b.pointer)
         .collect::<Vec<_>>();
-    let mut download_urls = Vec::new();
+    let mut download_urls = Vec::with_capacity(pointers.len());
 
     let mut offset = 0;
     loop {

@@ -1,6 +1,6 @@
 // cargo run --features reqwest --example blob_api
 
-use balatro_mod_index::{github::Tree, lfs::mut_fetch_blobs, mods};
+use balatro_mod_index::{github::Tree, mods};
 
 use env_logger::Env;
 
@@ -21,18 +21,7 @@ async fn main() -> Result<(), String> {
     mods.sort_by(|(_, a), (_, b)| a.meta.title.cmp(&b.meta.title));
     mods.sort_by(|(_, a), (_, b)| b.meta.last_updated.cmp(&a.meta.last_updated));
 
-    mut_fetch_blobs(
-        &mut index
-            .mods
-            .iter_mut()
-            .take(PAGE_SIZE)
-            .filter_map(|(_, m)| m.thumbnail.as_mut())
-            .collect::<Vec<_>>(),
-        &reqwest,
-        &index_repo,
-        CONCURRENCY_FACTOR,
-    )
-    .await?;
+    index.mut_fetch_blobs(&reqwest, CONCURRENCY_FACTOR).await?;
 
     for (mod_id, mod_data) in index.mods.iter().take(PAGE_SIZE) {
         log::info!(

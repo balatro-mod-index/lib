@@ -27,38 +27,39 @@ pub struct Mod {
     pub thumbnail: Option<lfs::Blob>,
 }
 
+#[cfg(all(feature = "reqwest", feature = "lfs"))]
+#[allow(clippy::missing_errors_doc)]
+pub async fn mut_fetch_blobs(
+    mods: &mut [(ModId, Mod)],
+    client: &reqwest::Client,
+    repo: &Tree<'_>,
+    concurrency_factor: usize,
+) -> Result<(), String> {
+    lfs::mut_fetch_blobs(
+        &mut mods
+            .iter_mut()
+            .filter_map(|(_, m)| m.thumbnail.as_mut())
+            .collect::<Vec<_>>(),
+        client,
+        repo,
+        concurrency_factor,
+    )
+    .await
+}
+
 pub struct ModIndex<'a> {
     pub mods: Vec<(ModId, Mod)>,
     pub repo: &'a Tree<'a>,
 }
-
-#[cfg(feature = "lfs")]
-#[allow(clippy::missing_errors_doc)]
 impl ModIndex<'_> {
-    pub fn batch_lfs_on<F>(
-        &self,
-        f: F,
-        offset: usize,
-        count: usize,
-    ) -> Result<(Vec<&lfs::Pointer>, usize), String>
-    where
-        F: Fn(&Mod) -> Option<&lfs::Pointer>,
-    {
-        use std::cmp::min;
-
-        if offset >= self.mods.len() {
-            return Err("cursor out of bounds".into());
-        }
-
-        let count = min(count, self.mods.len() - offset);
-        let mut pointers = Vec::with_capacity(count);
-        for (_, mod_data) in self.mods.iter().skip(offset).take(count) {
-            if let Some(p) = f(mod_data) {
-                pointers.push(p);
-            }
-        }
-
-        Ok((pointers, offset + count))
+    #[cfg(all(feature = "reqwest", feature = "lfs"))]
+    #[allow(clippy::missing_errors_doc)]
+    pub async fn mut_fetch_blobs(
+        &mut self,
+        client: &reqwest::Client,
+        concurrency_factor: usize,
+    ) -> Result<(), String> {
+        mut_fetch_blobs(&mut self.mods, client, self.repo, concurrency_factor).await
     }
 }
 
