@@ -1,15 +1,21 @@
 #![allow(clippy::missing_errors_doc)]
 
-#[derive(Default, Debug, Clone, serde::Serialize)]
+#[derive(PartialEq, Eq, Hash, Default, Debug, Clone, serde::Serialize)]
 pub struct Pointer {
     pub oid: String,
     pub size: usize,
+}
+#[derive(Debug, Clone)]
+pub struct Blob {
+    pub pointer: Pointer,
+    pub url: Option<String>,
+    pub data: Option<bytes::Bytes>,
 }
 
 #[derive(serde::Serialize)]
 pub struct BatchRequest<'a> {
     pub operation: String,
-    pub objects: &'a Vec<Pointer>,
+    pub objects: &'a [&'a Pointer],
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -113,7 +119,7 @@ pub async fn batch_query_objects(
                 break;
             }
         };
-        let objects = pointers.into_iter().cloned().collect::<Vec<_>>();
+        let objects = pointers.into_iter().collect::<Vec<_>>();
         let resp = client
             .post(format!(
                 "https://{}/{}/{}.git/info/lfs/objects/batch",
@@ -175,6 +181,81 @@ pub async fn fetch_one(
 }
 
 #[cfg(feature = "reqwest")]
+pub async fn mut_fetch_blobs(
+    blobs: &mut [&mut Blob],
+    client: &reqwest::Client,
+    tree: &super::github::Tree<'_>,
+    concurrency_factor: usize,
+) -> Result<(), String> {
+    use futures::{StreamExt, stream};
+    use std::cmp::min;
+
+    let pointers = blobs.iter().map(|b| &b.pointer).collect::<Vec<_>>();
+    let mut download_urls = Vec::new();
+
+    let mut offset = 0;
+    loop {
+        log::debug!("getting lfs object info at offset {offset}");
+        if offset >= pointers.len() {
+            break;
+        }
+        let count = min(
+            GH_API_UNAUTHENTICATED_BATCH_OBJECT_LIMIT,
+            pointers.len() - offset,
+        );
+
+        let resp = client
+            .post(format!(
+                "https://{}/{}/{}.git/info/lfs/objects/batch",
+                tree.hostname, tree.namespace, tree.name
+            ))
+            .json(&BatchRequest {
+                operation: String::from("download"),
+                objects: &pointers[offset..offset + count],
+            })
+            .header("Accept", "application/vnd.git-lfs+json")
+            .header("Content-Type", "application/vnd.git-lfs+json")
+            .send()
+            .await
+            .map_err(|_| "couldn't send request".to_string())?;
+
+        let data = resp
+            .bytes()
+            .await
+            .map_err(|e| format!("couldn't read raw response: {e}"))?
+            .to_vec();
+
+        let data: BatchResponse = serde_json::from_slice(&data)
+            .map_err(|_| match String::from_utf8(data) {
+                Ok(s) => format!("response was not json, but a string: {s}"),
+                Err(e) => format!("response was not json, and not a valid utf-8 string: {e}"),
+            })
+            .map_err(|e| format!("couldn't parse response: {e}"))?;
+
+        download_urls.extend(
+            data.objects
+                .into_iter()
+                .map(|obj| (obj.oid, obj.actions.download.href)),
+        );
+
+        offset += GH_API_UNAUTHENTICATED_BATCH_OBJECT_LIMIT;
+    }
+
+    let download_results = stream::iter(&download_urls)
+        .map(|(oid, url)| async move { (url, fetch_one(client, url, oid).await) })
+        .buffer_unordered(concurrency_factor)
+        .collect::<Vec<_>>()
+        .await;
+
+    for (blob, (url, data)) in blobs.iter_mut().zip(download_results) {
+        blob.url = Some(url.into());
+        blob.data = data.ok();
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "reqwest")]
 use std::collections::HashMap;
 
 #[cfg(feature = "reqwest")]
@@ -186,6 +267,7 @@ pub async fn memoized_concurrent_download<'a>(
 ) -> Result<HashMap<&'a String, bytes::Bytes>, String> {
     concurrent_download_impl(fetch_one, urls, client, concurrency_factor).await
 }
+
 #[cfg(feature = "reqwest")]
 #[allow(clippy::missing_errors_doc)]
 pub async fn concurrent_download<'a>(

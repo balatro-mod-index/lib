@@ -30,7 +30,7 @@ async fn main() -> Result<(), String> {
     let thumbnail_pointers = index
         .mods
         .iter()
-        .filter_map(|(_, m)| m.thumbnail.as_ref())
+        .filter_map(|(_, m)| m.thumbnail.as_ref().map(|p| &p.pointer))
         .collect::<Vec<_>>();
     let lfs_urls = lfs::batch_query_objects(&thumbnail_pointers, &reqwest, &index_repo).await?;
 
@@ -45,7 +45,7 @@ async fn main() -> Result<(), String> {
                 .iter()
                 .skip(next)
                 .take(PAGE_SIZE)
-                .filter_map(|(_, m)| m.thumbnail.as_ref());
+                .filter_map(|(_, m)| m.thumbnail.as_ref().map(|p| &p.pointer));
             let urls = thumbnail_pointers
                 .map(|t| {
                     let oid = &t.oid;
@@ -65,18 +65,19 @@ async fn main() -> Result<(), String> {
                     "mod `{}`, last updated on {} has {}",
                     id,
                     m.meta.last_updated.unwrap_or_default(),
-                    m.thumbnail
-                        .as_ref()
-                        .map_or("no thumbnail".to_string(), |p| format!(
+                    m.thumbnail.as_ref().map(|p| &p.pointer.oid).map_or(
+                        "no thumbnail".to_string(),
+                        |oid| format!(
                             "thumbnail of size {}",
-                            thumbnails.get(&p.oid).map_or_else(
+                            thumbnails.get(oid).map_or_else(
                                 || {
-                                    log::warn!("thumbnail {} for mod {} is empty", p.oid, id);
+                                    log::warn!("thumbnail {oid} for mod {id} is empty");
                                     0
                                 },
                                 bytes::Bytes::len
                             )
-                        ))
+                        )
+                    )
                 );
             }
 

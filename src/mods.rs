@@ -24,7 +24,7 @@ pub struct Mod {
     pub meta: ModMeta,
     pub description: Option<String>,
     #[cfg(feature = "lfs")]
-    pub thumbnail: Option<lfs::Pointer>,
+    pub thumbnail: Option<lfs::Blob>,
 }
 
 pub struct ModIndex<'a> {
@@ -129,10 +129,12 @@ impl ModIndex<'_> {
                 }
                 #[cfg(feature = "lfs")]
                 "thumbnail.jpg" | "thumbnail.png" => {
-                    the_mod.thumbnail = Some(
-                        lfs::parse_pointer(&String::from_utf8_lossy(&buffer))
+                    the_mod.thumbnail = Some(lfs::Blob {
+                        pointer: lfs::parse_pointer(&String::from_utf8_lossy(&buffer))
                             .map_err(|e| format!("couldn't parse lfs pointer: {e}"))?,
-                    );
+                        url: None,
+                        data: None,
+                    });
                 }
                 _ => {}
             }

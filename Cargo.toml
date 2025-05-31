@@ -11,7 +11,7 @@ name = "no_request_wasted"
 required-features = ["reqwest"]
 
 [dependencies]
-bytes = { version = "1.10.1", optional = true }
+bytes = { version = "1.10.1" }
 cached = { version = "0.55.1", features = ["async"] }
 futures = { version = "0.3.31", optional = true }
 log = "0.4.27"
@@ -32,6 +32,6 @@ zip = "4.0.0"
 [features]
 default = ["zip", "lfs"]
 zip = ["dep:zip"]
-reqwest = ["dep:reqwest", "dep:futures", "dep:bytes"]
+reqwest = ["dep:reqwest", "dep:futures"]
 lfs = []
 
