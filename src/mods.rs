@@ -74,7 +74,7 @@ pub struct ModMeta {
     pub repo: String,
     pub title: String,
     #[serde(rename = "downloadURL")]
-    pub download_url: Option<String>,
+    pub download_url: String,
     #[serde(rename = "folderName")]
     pub folder_name: Option<String>,
     pub version: Option<String>,
