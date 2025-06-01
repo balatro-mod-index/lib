@@ -10,7 +10,7 @@ const PAGE_SIZE: usize = 20;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
-    env_logger::Builder::from_env(Env::new().default_filter_or("info")).init();
+    env_logger::Builder::from_env(Env::new().default_filter_or("debug")).init();
 
     let reqwest = reqwest::Client::new();
     let index_repo = Tree::default();

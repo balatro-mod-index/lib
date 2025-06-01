@@ -1,7 +1,19 @@
 [package]
 name = "balatro_mod_index"
+description = "a library for parsing a git lfs repo into a BMM-compatible index"
 version = "0.0.0"
 edition = "2024"
+license-file = "license.md"
+exclude = [".gitignore", "flake.*"]
+repository = "https://github.com/balatro-mod-index/lib"
+keywords = ["balatro", "modding", "git", "lfs", "github"]
+categories = [
+  "development-tools",
+  "encoding",
+  "network-programming",
+  "parser-implementations",
+  "web-programming::http-client"
+]
 
 [lib]
 name = "balatro_mod_index"
@@ -15,7 +27,7 @@ required-features = ["reqwest"]
 
 [dependencies]
 bytes = { version = "1.10.1" }
-cached = { version = "0.55.1", features = ["async"] }
+cached = { version = "0.55.1", features = ["async"], optional = true }
 futures = { version = "0.3.31", optional = true }
 log = "0.4.27"
 reqwest = { version = "0.12.17", features = ["json"], optional = true }
@@ -35,6 +47,6 @@ zip = "4.0.0"
 [features]
 default = ["zip", "lfs"]
 zip = ["dep:zip"]
-reqwest = ["dep:reqwest", "dep:futures"]
+reqwest = ["dep:reqwest", "dep:futures", "dep:cached"]
 lfs = []
 

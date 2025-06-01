@@ -21,7 +21,7 @@
       in {
         devShells.default = pkgs.mkShell {
           packages =
-            (with pkgs; [openssl pkg-config])
+            (with pkgs; [openssl pkg-config cargo-hack])
             ++ [
               (rust-toolchain.override
                 {extensions = ["rust-src" "rust-analyzer" "clippy"];})
