@@ -7,7 +7,7 @@ edition = "2024"
 name = "balatro_mod_index"
 
 [[example]]
-name = "no_request_wasted"
+name = "blob_api"
 required-features = ["reqwest"]
 
 [dependencies]
