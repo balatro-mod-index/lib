@@ -181,13 +181,11 @@ pub async fn fetch_one(
 }
 
 #[cfg(feature = "reqwest")]
-pub async fn mut_fetch_blobs(
+pub async fn mut_fetch_download_urls(
     blobs: &mut [&mut Blob],
     client: &reqwest::Client,
     tree: &super::github::Tree<'_>,
-    concurrency_factor: usize,
 ) -> Result<(), String> {
-    use futures::{StreamExt, stream};
     use std::cmp::min;
 
     let pointers = blobs
@@ -248,6 +246,20 @@ pub async fn mut_fetch_blobs(
     for (blob, url) in blobs.iter_mut().zip(&download_urls) {
         blob.url = Some(url.into());
     }
+
+    Ok(())
+}
+
+#[cfg(feature = "reqwest")]
+pub async fn mut_fetch_blobs(
+    blobs: &mut [&mut Blob],
+    client: &reqwest::Client,
+    tree: &super::github::Tree<'_>,
+    concurrency_factor: usize,
+) -> Result<(), String> {
+    use futures::{StreamExt, stream};
+
+    mut_fetch_download_urls(blobs, client, tree).await?;
 
     stream::iter(blobs.iter_mut().filter_map(|b| {
         b.url.as_ref().map(|url| async {
