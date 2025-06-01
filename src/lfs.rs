@@ -239,22 +239,24 @@ pub async fn mut_fetch_blobs(
         download_urls.extend(
             data.objects
                 .into_iter()
-                .map(|obj| (obj.oid, obj.actions.download.href)),
+                .map(|obj| obj.actions.download.href),
         );
 
         offset += GH_API_UNAUTHENTICATED_BATCH_OBJECT_LIMIT;
     }
 
-    let download_results = stream::iter(&download_urls)
-        .map(|(oid, url)| async move { (url, fetch_one(client, url, oid).await) })
-        .buffer_unordered(concurrency_factor)
-        .collect::<Vec<_>>()
-        .await;
-
-    for (blob, (url, data)) in blobs.iter_mut().zip(download_results) {
+    for (blob, url) in blobs.iter_mut().zip(&download_urls) {
         blob.url = Some(url.into());
-        blob.data = data.ok();
     }
+
+    stream::iter(blobs.iter_mut().filter_map(|b| {
+        b.url.as_ref().map(|url| async {
+            b.data = fetch_one(client, url, &b.pointer.oid).await.ok();
+        })
+    }))
+    .buffer_unordered(concurrency_factor)
+    .collect::<Vec<_>>()
+    .await;
 
     Ok(())
 }
