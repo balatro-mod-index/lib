@@ -134,7 +134,7 @@ impl ModIndex<'_> {
                         pointer: lfs::parse_pointer(&String::from_utf8_lossy(&buffer))
                             .map_err(|e| format!("couldn't parse lfs pointer: {e}"))?,
                         url: None,
-                        data: None,
+                        data: Err("no download attempts yet".into()),
                     });
                 }
                 _ => {}

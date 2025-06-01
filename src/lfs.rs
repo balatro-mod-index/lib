@@ -9,7 +9,7 @@ pub struct Pointer {
 pub struct Blob {
     pub pointer: Pointer,
     pub url: Option<String>,
-    pub data: Option<bytes::Bytes>,
+    pub data: Result<bytes::Bytes, String>,
 }
 
 #[derive(serde::Serialize)]
@@ -192,7 +192,7 @@ pub async fn mut_fetch_blobs(
 
     let pointers = blobs
         .iter()
-        .filter(|b| b.data.is_none())
+        .filter(|b| b.data.is_err())
         .map(|b| &b.pointer)
         .collect::<Vec<_>>();
     let mut download_urls = Vec::with_capacity(pointers.len());
@@ -251,7 +251,7 @@ pub async fn mut_fetch_blobs(
 
     stream::iter(blobs.iter_mut().filter_map(|b| {
         b.url.as_ref().map(|url| async {
-            b.data = fetch_one(client, url, &b.pointer.oid).await.ok();
+            b.data = fetch_one(client, url, &b.pointer.oid).await;
         })
     }))
     .buffer_unordered(concurrency_factor)
