@@ -109,10 +109,11 @@ pub async fn mut_fetch_download_urls(
 
     let mut offset = 0;
     loop {
-        log::debug!("getting lfs object info at offset {offset}");
         if offset >= pointers.len() {
+            log::debug!("done fetching lfs info, last offset was {offset}");
             break;
         }
+        log::debug!("getting lfs object info at offset {offset}");
         let count = min(
             GH_API_UNAUTHENTICATED_BATCH_OBJECT_LIMIT,
             pointers.len() - offset,
@@ -152,7 +153,7 @@ pub async fn mut_fetch_download_urls(
                 .map(|obj| obj.actions.download.href),
         );
 
-        offset += GH_API_UNAUTHENTICATED_BATCH_OBJECT_LIMIT;
+        offset += count;
     }
 
     for (blob, url) in blobs.iter_mut().zip(&download_urls) {
