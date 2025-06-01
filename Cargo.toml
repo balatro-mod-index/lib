@@ -1,9 +1,9 @@
 [package]
 name = "balatro_mod_index"
 description = "a library for parsing a git lfs repo into a BMM-compatible index"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
-license-file = "license.md"
+license = "LGPL-3.0-only"
 exclude = [".gitignore", "flake.*"]
 repository = "https://github.com/balatro-mod-index/lib"
 keywords = ["balatro", "modding", "git", "lfs", "github"]
@@ -50,3 +50,5 @@ zip = ["dep:zip"]
 reqwest = ["dep:reqwest", "dep:futures", "dep:cached"]
 lfs = []
 
+[package.metadata.docs.rs]
+all-features = true
