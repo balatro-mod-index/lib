@@ -97,14 +97,19 @@ pub async fn mut_fetch_download_urls(
     blobs: &mut [&mut Blob],
     client: &reqwest::Client,
     tree: &super::github::Tree<'_>,
+    refresh_available: bool,
 ) -> Result<(), String> {
     use std::cmp::min;
 
-    let pointers = blobs
-        .iter()
-        .filter(|b| b.data.is_err())
-        .map(|b| &b.pointer)
-        .collect::<Vec<_>>();
+    let pointers = if refresh_available {
+        blobs.iter().map(|b| &b.pointer).collect::<Vec<_>>()
+    } else {
+        blobs
+            .iter()
+            .filter(|b| b.url.is_none())
+            .map(|b| &b.pointer)
+            .collect::<Vec<_>>()
+    };
     let mut download_urls = Vec::with_capacity(pointers.len());
 
     let mut offset = 0;
@@ -169,10 +174,11 @@ pub async fn mut_fetch_blobs(
     client: &reqwest::Client,
     tree: &super::github::Tree<'_>,
     concurrency_factor: usize,
+    refresh_urls: bool,
 ) -> Result<(), String> {
     use futures::{StreamExt, stream};
 
-    mut_fetch_download_urls(blobs, client, tree).await?;
+    mut_fetch_download_urls(blobs, client, tree, refresh_urls).await?;
 
     stream::iter(blobs.iter_mut().filter_map(|b| {
         b.url.as_ref().map(|url| async {

@@ -43,6 +43,7 @@ pub async fn mut_fetch_blobs(
         client,
         repo,
         concurrency_factor,
+        true,
     )
     .await
 }
