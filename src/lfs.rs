@@ -6,16 +6,17 @@ pub struct Pointer {
     pub size: usize,
 }
 #[derive(Debug, Clone)]
-pub struct Blob {
+pub struct Blob<'tree> {
     pub pointer: Pointer,
     pub url: Option<String>,
     pub data: Result<bytes::Bytes, String>,
+    pub tree: &'tree crate::github::Tree<'tree>,
 }
 
 #[derive(serde::Serialize)]
-pub struct BatchRequest<'a> {
+pub struct BatchRequest<'pointers> {
     pub operation: String,
-    pub objects: &'a [&'a Pointer],
+    pub objects: &'pointers [&'pointers Pointer],
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -81,7 +82,6 @@ pub async fn fetch_one(
     url: &String,
     #[allow(unused_variables)] oid: &str, // our cache key
 ) -> Result<bytes::Bytes, String> {
-    log::debug!("fetching blob at {url}");
     client
         .get(url)
         .send()
@@ -94,13 +94,13 @@ pub async fn fetch_one(
 
 #[cfg(feature = "reqwest")]
 pub async fn mut_fetch_download_urls(
-    blobs: &mut [&mut Blob],
+    blobs: &mut [&mut Blob<'_>],
     client: &reqwest::Client,
-    tree: &super::github::Tree<'_>,
     refresh_available: bool,
 ) -> Result<(), String> {
     use std::cmp::min;
 
+    let tree = blobs.first().ok_or("no blobs to fetch")?.tree;
     let pointers = if refresh_available {
         blobs.iter().map(|b| &b.pointer).collect::<Vec<_>>()
     } else {
@@ -115,7 +115,11 @@ pub async fn mut_fetch_download_urls(
     let mut offset = 0;
     loop {
         if offset >= pointers.len() {
-            log::debug!("done fetching lfs info, last offset was {offset}");
+            if offset == 0 {
+                log::debug!("no lfs info to fetch");
+            } else {
+                log::debug!("done fetching lfs info, last offset was {offset}");
+            }
             break;
         }
         log::debug!("getting lfs object info at offset {offset}");
@@ -170,15 +174,14 @@ pub async fn mut_fetch_download_urls(
 
 #[cfg(feature = "reqwest")]
 pub async fn mut_fetch_blobs(
-    blobs: &mut [&mut Blob],
+    blobs: &mut [&mut Blob<'_>],
     client: &reqwest::Client,
-    tree: &super::github::Tree<'_>,
     concurrency_factor: usize,
     refresh_urls: bool,
 ) -> Result<(), String> {
     use futures::{StreamExt, stream};
 
-    mut_fetch_download_urls(blobs, client, tree, refresh_urls).await?;
+    mut_fetch_download_urls(blobs, client, refresh_urls).await?;
 
     stream::iter(blobs.iter_mut().filter_map(|b| {
         b.url.as_ref().map(|url| async {

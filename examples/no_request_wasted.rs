@@ -28,7 +28,6 @@ async fn main() -> Result<(), String> {
             .filter_map(|(_, m)| m.thumbnail.as_mut())
             .collect::<Vec<_>>(),
         &reqwest,
-        &index_repo,
         false,
     )
     .await?;
@@ -40,7 +39,6 @@ async fn main() -> Result<(), String> {
             .filter_map(|(_, m)| m.thumbnail.as_mut())
             .collect::<Vec<_>>(),
         &reqwest,
-        &index_repo,
         CONCURRENCY_FACTOR,
         false,
     )

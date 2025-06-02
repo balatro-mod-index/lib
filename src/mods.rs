@@ -19,20 +19,25 @@ impl Clone for ModId {
     }
 }
 
+#[cfg(feature = "lfs")]
+#[derive(Clone, Default, Debug)]
+pub struct Mod<'blob> {
+    pub meta: ModMeta,
+    pub description: Option<String>,
+    pub thumbnail: Option<lfs::Blob<'blob>>,
+}
+#[cfg(not(feature = "lfs"))]
 #[derive(Clone, Default, Debug)]
 pub struct Mod {
     pub meta: ModMeta,
     pub description: Option<String>,
-    #[cfg(feature = "lfs")]
-    pub thumbnail: Option<lfs::Blob>,
 }
 
 #[cfg(all(feature = "reqwest", feature = "lfs"))]
 #[allow(clippy::missing_errors_doc)]
 pub async fn mut_fetch_blobs(
-    mods: &mut [(ModId, Mod)],
+    mods: &mut [(ModId, Mod<'_>)],
     client: &reqwest::Client,
-    repo: &Tree<'_>,
     concurrency_factor: usize,
 ) -> Result<(), String> {
     lfs::mut_fetch_blobs(
@@ -41,17 +46,21 @@ pub async fn mut_fetch_blobs(
             .filter_map(|(_, m)| m.thumbnail.as_mut())
             .collect::<Vec<_>>(),
         client,
-        repo,
         concurrency_factor,
         true,
     )
     .await
 }
 
-pub struct ModIndex<'a> {
+pub struct ModIndex<'tree> {
+    #[cfg(feature = "lfs")]
+    pub mods: Vec<(ModId, Mod<'tree>)>,
+    #[cfg(not(feature = "lfs"))]
     pub mods: Vec<(ModId, Mod)>,
-    pub repo: &'a Tree<'a>,
+
+    pub repo: &'tree Tree<'tree>,
 }
+
 impl ModIndex<'_> {
     #[cfg(all(feature = "reqwest", feature = "lfs"))]
     #[allow(clippy::missing_errors_doc)]
@@ -60,7 +69,7 @@ impl ModIndex<'_> {
         client: &reqwest::Client,
         concurrency_factor: usize,
     ) -> Result<(), String> {
-        mut_fetch_blobs(&mut self.mods, client, self.repo, concurrency_factor).await
+        mut_fetch_blobs(&mut self.mods, client, concurrency_factor).await
     }
 }
 
@@ -136,6 +145,7 @@ impl ModIndex<'_> {
                             .map_err(|e| format!("couldn't parse lfs pointer: {e}"))?,
                         url: None,
                         data: Err("no download attempts yet".into()),
+                        tree: source_spec,
                     });
                 }
                 _ => {}
