@@ -33,25 +33,6 @@ pub struct Mod {
     pub description: Option<String>,
 }
 
-#[cfg(all(feature = "reqwest", feature = "lfs"))]
-#[allow(clippy::missing_errors_doc)]
-pub async fn mut_fetch_blobs(
-    mods: &mut [(ModId, Mod<'_>)],
-    client: &reqwest::Client,
-    concurrency_factor: usize,
-) -> Result<(), String> {
-    lfs::mut_fetch_blobs(
-        &mut mods
-            .iter_mut()
-            .filter_map(|(_, m)| m.thumbnail.as_mut())
-            .collect::<Vec<_>>(),
-        client,
-        concurrency_factor,
-        true,
-    )
-    .await
-}
-
 pub struct ModIndex<'tree> {
     #[cfg(feature = "lfs")]
     pub mods: Vec<(ModId, Mod<'tree>)>,
@@ -61,15 +42,67 @@ pub struct ModIndex<'tree> {
     pub repo: &'tree Tree<'tree>,
 }
 
+#[cfg(all(feature = "reqwest", feature = "lfs"))]
 impl ModIndex<'_> {
-    #[cfg(all(feature = "reqwest", feature = "lfs"))]
+    #[allow(clippy::missing_errors_doc)]
+    pub async fn mut_fetch_blob_urls(
+        &mut self,
+        client: &reqwest::Client,
+        concurrency_factor: usize,
+        offset: usize,
+        count: usize,
+        refresh_urls: bool,
+    ) -> Result<usize, String> {
+        use std::cmp::min;
+
+        if offset >= self.mods.len() {
+            return Err(format!(
+                "offset {offset} is out of bounds for index with {} mods",
+                self.mods.len()
+            ));
+        }
+
+        let next = min(offset + count, self.mods.len());
+
+        let blobs = &mut self.mods[offset..next]
+            .iter_mut()
+            .filter_map(|(_, m)| m.thumbnail.as_mut())
+            .collect::<Vec<_>>();
+
+        lfs::mut_fetch_download_urls(blobs, client, concurrency_factor, refresh_urls).await?;
+
+        Ok(next)
+    }
+
     #[allow(clippy::missing_errors_doc)]
     pub async fn mut_fetch_blobs(
         &mut self,
         client: &reqwest::Client,
         concurrency_factor: usize,
-    ) -> Result<(), String> {
-        mut_fetch_blobs(&mut self.mods, client, concurrency_factor).await
+        offset: usize,
+        count: usize,
+        refresh_urls: bool,
+    ) -> Result<usize, String> {
+        use std::cmp::min;
+
+        if offset >= self.mods.len() {
+            return Err(format!(
+                "offset {offset} is out of bounds for index with {} mods",
+                self.mods.len()
+            ));
+        }
+
+        let next = min(offset + count, self.mods.len());
+
+        let blobs = &mut self.mods[offset..next]
+            .iter_mut()
+            .filter_map(|(_, m)| m.thumbnail.as_mut())
+            .collect::<Vec<_>>();
+
+        lfs::mut_fetch_download_urls(blobs, client, concurrency_factor, refresh_urls).await?;
+        lfs::mut_fetch_blobs(blobs, client, concurrency_factor).await?;
+
+        Ok(next)
     }
 }
 

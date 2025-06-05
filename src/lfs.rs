@@ -86,18 +86,20 @@ pub async fn fetch_one(
         .get(url)
         .send()
         .await
-        .map_err(|e| format!("couldn't fetch blob at {url}: {e}"))?
+        .map_err(|e| format!("couldn't GET {url}: {e}"))?
         .bytes()
         .await
-        .map_err(|e| format!("couldn't get response body {url}: {e}"))
+        .map_err(|e| format!("couldn't get response body for {url}: {e}"))
 }
 
 #[cfg(feature = "reqwest")]
 pub async fn mut_fetch_download_urls(
     blobs: &mut [&mut Blob<'_>],
     client: &reqwest::Client,
+    concurrency_factor: usize,
     refresh_available: bool,
 ) -> Result<(), String> {
+    use futures::{StreamExt, stream};
     use std::cmp::min;
 
     let tree = blobs.first().ok_or("no blobs to fetch")?.tree;
@@ -110,63 +112,82 @@ pub async fn mut_fetch_download_urls(
             .map(|b| &b.pointer)
             .collect::<Vec<_>>()
     };
-    let mut download_urls = Vec::with_capacity(pointers.len());
+
+    if pointers.is_empty() {
+        log::debug!("no lfs info to fetch");
+        return Ok(());
+    }
+
+    log::debug!("fetching lfs info for {} blobs", pointers.len());
+
+    let mut tasks = Vec::new();
 
     let mut offset = 0;
-    loop {
-        if offset >= pointers.len() {
-            if offset == 0 {
-                log::debug!("no lfs info to fetch");
-            } else {
-                log::debug!("done fetching lfs info, last offset was {offset}");
-            }
-            break;
-        }
-        log::debug!("getting lfs object info at offset {offset}");
+    while offset < pointers.len() {
         let count = min(
             GH_API_UNAUTHENTICATED_BATCH_OBJECT_LIMIT,
             pointers.len() - offset,
         );
 
-        let resp = client
-            .post(format!(
-                "https://{}/{}/{}.git/info/lfs/objects/batch",
-                tree.hostname, tree.namespace, tree.name
-            ))
-            .json(&BatchRequest {
-                operation: String::from("download"),
-                objects: &pointers[offset..offset + count],
-            })
-            .header("Accept", "application/vnd.git-lfs+json")
-            .header("Content-Type", "application/vnd.git-lfs+json")
-            .send()
-            .await
-            .map_err(|_| "couldn't send request".to_string())?;
+        let next = offset + count;
 
-        let data = resp
-            .bytes()
-            .await
-            .map_err(|e| format!("couldn't read raw response: {e}"))?
-            .to_vec();
+        let batch = &pointers[offset..next];
 
-        let data: BatchResponse = serde_json::from_slice(&data)
-            .map_err(|_| match String::from_utf8(data) {
-                Ok(s) => format!("response was not json, but a string: {s}"),
-                Err(e) => format!("response was not json, and not a valid utf-8 string: {e}"),
-            })
-            .map_err(|e| format!("couldn't parse response: {e}"))?;
+        let future = async move {
+            log::debug!("getting lfs object info at offset {offset}");
+            let resp = client
+                .post(format!(
+                    "https://{}/{}/{}.git/info/lfs/objects/batch",
+                    tree.hostname, tree.namespace, tree.name
+                ))
+                .json(&BatchRequest {
+                    operation: String::from("download"),
+                    objects: batch,
+                })
+                .header("Accept", "application/vnd.git-lfs+json")
+                .header("Content-Type", "application/vnd.git-lfs+json")
+                .send()
+                .await
+                .map_err(|_| "couldn't send request".to_string())?;
 
-        download_urls.extend(
-            data.objects
+            let data = resp
+                .bytes()
+                .await
+                .map_err(|e| format!("couldn't read raw response: {e}"))?
+                .to_vec();
+
+            let data: BatchResponse = serde_json::from_slice(&data)
+                .map_err(|_| match String::from_utf8(data) {
+                    Ok(s) => format!("response was not json, but a string: {s}"),
+                    Err(e) => format!("response was not json, and not a valid utf-8 string: {e}"),
+                })
+                .map_err(|e| format!("couldn't parse response: {e}"))?;
+
+            Ok(data
+                .objects
                 .into_iter()
-                .map(|obj| obj.actions.download.href),
-        );
+                .map(|obj| obj.actions.download.href)
+                .collect::<Vec<_>>())
+        };
+        tasks.push(future);
 
-        offset += count;
+        offset = next;
     }
 
-    for (blob, url) in blobs.iter_mut().zip(&download_urls) {
-        blob.url = Some(url.into());
+    let download_urls = stream::iter(tasks)
+        .buffer_unordered(concurrency_factor)
+        .collect::<Vec<Result<Vec<String>, String>>>()
+        .await
+        .into_iter()
+        .map(Result::ok)
+        .try_fold(Vec::new(), |mut acc, result| {
+            acc.extend(result?);
+            Some(acc)
+        })
+        .ok_or("couldn't fetch download urls")?;
+
+    for (blob, url) in blobs.iter_mut().zip(download_urls) {
+        blob.url = Some(url);
     }
 
     Ok(())
@@ -177,11 +198,8 @@ pub async fn mut_fetch_blobs(
     blobs: &mut [&mut Blob<'_>],
     client: &reqwest::Client,
     concurrency_factor: usize,
-    refresh_urls: bool,
 ) -> Result<(), String> {
     use futures::{StreamExt, stream};
-
-    mut_fetch_download_urls(blobs, client, refresh_urls).await?;
 
     stream::iter(blobs.iter_mut().filter_map(|b| {
         b.url.as_ref().map(|url| async {

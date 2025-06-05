@@ -21,9 +21,6 @@ name = "balatro_mod_index"
 [[example]]
 name = "blob_api"
 required-features = ["reqwest"]
-[[example]]
-name = "no_request_wasted"
-required-features = ["reqwest"]
 
 [dependencies]
 bytes = { version = "1.10.1" }
