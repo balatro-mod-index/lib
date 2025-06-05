@@ -71,10 +71,11 @@ pub fn parse_pointer(input: &str) -> Result<Pointer, String> {
 }
 
 #[cfg(feature = "reqwest")]
+// cache a max of 100 responses for 30 minutes
 #[cached::proc_macro::cached(
     result = true,
-    ty = "cached::SizedCache<String, bytes::Bytes>",
-    create = "{ cached::SizedCache::with_size(100) }",
+    ty = "cached::TimedSizedCache<String, bytes::Bytes>",
+    create = "{ cached::TimedSizedCache::with_size_and_lifespan(100, 1800) }",
     convert = r#"{ format!("{}", oid) }"#
 )]
 pub async fn fetch_one(
