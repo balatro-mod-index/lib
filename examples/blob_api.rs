@@ -7,7 +7,7 @@ use env_logger::Env;
 const CONCURRENCY_FACTOR: usize = 50;
 
 const PAGE_SIZE: usize = 5;
-const PAGES_TO_FETCH: usize = 4;
+const PAGES_TO_FETCH: usize = 20;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
@@ -38,7 +38,8 @@ async fn main() -> Result<(), String> {
 
         for (mod_id, mod_data) in index.mods.iter().skip(offset).take(PAGE_SIZE) {
             log::info!(
-                "{mod_id}: has {}",
+                "{mod_id}: last updated at {} has {}",
+                mod_data.meta.last_updated.unwrap_or_default(),
                 mod_data
                     .thumbnail
                     .as_ref()

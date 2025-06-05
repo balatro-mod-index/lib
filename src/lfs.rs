@@ -71,29 +71,6 @@ pub fn parse_pointer(input: &str) -> Result<Pointer, String> {
 }
 
 #[cfg(feature = "reqwest")]
-// cache a max of 100 responses for 30 minutes
-#[cached::proc_macro::cached(
-    result = true,
-    ty = "cached::TimedSizedCache<String, bytes::Bytes>",
-    create = "{ cached::TimedSizedCache::with_size_and_lifespan(100, 1800) }",
-    convert = r#"{ format!("{}", oid) }"#
-)]
-pub async fn fetch_one(
-    client: &reqwest::Client,
-    url: &String,
-    #[allow(unused_variables)] oid: &str, // our cache key
-) -> Result<bytes::Bytes, String> {
-    client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| format!("couldn't GET {url}: {e}"))?
-        .bytes()
-        .await
-        .map_err(|e| format!("couldn't get response body for {url}: {e}"))
-}
-
-#[cfg(feature = "reqwest")]
 pub async fn mut_fetch_download_urls(
     blobs: &mut [&mut Blob<'_>],
     client: &reqwest::Client,
@@ -212,4 +189,27 @@ pub async fn mut_fetch_blobs(
     .await;
 
     Ok(())
+}
+
+#[cfg(feature = "reqwest")]
+// cache a max of 100 responses for 30 minutes
+#[cached::proc_macro::cached(
+    result = true,
+    ty = "cached::TimedSizedCache<String, bytes::Bytes>",
+    create = "{ cached::TimedSizedCache::with_size_and_lifespan(100, 1800) }",
+    convert = r#"{ format!("{}", oid) }"#
+)]
+pub async fn fetch_one(
+    client: &reqwest::Client,
+    url: &String,
+    #[allow(unused_variables)] oid: &str, // our cache key
+) -> Result<bytes::Bytes, String> {
+    client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("couldn't GET {url}: {e}"))?
+        .bytes()
+        .await
+        .map_err(|e| format!("couldn't get response body for {url}: {e}"))
 }

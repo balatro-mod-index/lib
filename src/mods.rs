@@ -42,6 +42,81 @@ pub struct ModIndex<'tree> {
     pub repo: &'tree Tree<'tree>,
 }
 
+#[cfg(feature = "zip")]
+#[allow(clippy::missing_errors_doc)]
+impl ModIndex<'_> {
+    #[cfg(feature = "reqwest")]
+    #[allow(clippy::missing_errors_doc)]
+    pub async fn from_reqwest<'a>(
+        reqwest: &reqwest::Client,
+        source_spec: &'a Tree<'a>,
+    ) -> Result<ModIndex<'a>, String> {
+        let url = format!(
+            "https://{}/{}/{}/archive/refs/heads/{}.zip",
+            source_spec.hostname, source_spec.namespace, source_spec.name, source_spec.rev
+        );
+        let response = reqwest.get(&url).send().await.map_err(|e| e.to_string())?;
+
+        let zip = response.bytes().await.map_err(|e| e.to_string())?;
+        log::info!("downloaded zip file {url}");
+
+        let mut archive = ZipArchive::new(std::io::Cursor::new(zip)).map_err(|e| e.to_string())?;
+        log::debug!("scanning {} files", archive.len());
+        ModIndex::from_zip(&mut archive, source_spec).map_err(|e| e.to_string())
+    }
+
+    pub fn from_zip<'a, R: std::io::Read + std::io::Seek>(
+        zip: &mut ZipArchive<R>,
+        source_spec: &'a Tree,
+    ) -> Result<ModIndex<'a>, String> {
+        use std::{collections::HashMap, io::Read};
+
+        let mut mods = HashMap::<ModId, Mod>::new();
+        for file_number in 0..zip.len() {
+            let mut item = zip.by_index(file_number).map_err(|e| e.to_string())?;
+
+            let prefix = format!("{}-{}/mods/", source_spec.name, source_spec.rev);
+            if !item.is_file() || !item.name().starts_with(&prefix) {
+                continue;
+            }
+
+            let mut buffer: Vec<u8> = Vec::new();
+            let _bytes_read = item.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+
+            let path = item.name().trim_start_matches(&prefix);
+            let parts = path.split('/').collect::<Vec<_>>();
+            let mod_id = ModId((*parts.first().ok_or("path is not pathing")?).to_string());
+            let the_mod = mods.entry(mod_id).or_default();
+
+            match *parts.get(1).ok_or("sub-path is not pathing")? {
+                "meta.json" => {
+                    the_mod.meta = ModMeta::from_slice(&buffer)
+                        .map_err(|e| format!("couldn't parse mod meta for {}: {e}", parts[0]))?;
+                }
+                "description.md" => {
+                    the_mod.description = Some(String::from_utf8_lossy(&buffer).to_string());
+                }
+                #[cfg(feature = "lfs")]
+                "thumbnail.jpg" | "thumbnail.png" => {
+                    the_mod.thumbnail = Some(lfs::Blob {
+                        pointer: lfs::parse_pointer(&String::from_utf8_lossy(&buffer))
+                            .map_err(|e| format!("couldn't parse lfs pointer: {e}"))?,
+                        url: None,
+                        data: Err("no download attempts yet".into()),
+                        tree: source_spec,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        Ok(ModIndex {
+            mods: mods.into_iter().collect::<Vec<_>>(),
+            repo: source_spec,
+        })
+    }
+}
+
 #[cfg(all(feature = "reqwest", feature = "lfs"))]
 impl ModIndex<'_> {
     #[allow(clippy::missing_errors_doc)]
@@ -134,80 +209,5 @@ impl std::str::FromStr for ModMeta {
     type Err = String;
     fn from_str(text: &str) -> Result<ModMeta, Self::Err> {
         serde_json::from_str::<ModMeta>(text).map_err(|e| e.to_string())
-    }
-}
-
-#[cfg(feature = "zip")]
-#[allow(clippy::missing_errors_doc)]
-impl ModIndex<'_> {
-    #[cfg(feature = "reqwest")]
-    #[allow(clippy::missing_errors_doc)]
-    pub async fn from_reqwest<'a>(
-        reqwest: &reqwest::Client,
-        source_spec: &'a Tree<'a>,
-    ) -> Result<ModIndex<'a>, String> {
-        let url = format!(
-            "https://{}/{}/{}/archive/refs/heads/{}.zip",
-            source_spec.hostname, source_spec.namespace, source_spec.name, source_spec.rev
-        );
-        let response = reqwest.get(&url).send().await.map_err(|e| e.to_string())?;
-
-        let zip = response.bytes().await.map_err(|e| e.to_string())?;
-        log::info!("downloaded zip file {url}");
-
-        let mut archive = ZipArchive::new(std::io::Cursor::new(zip)).map_err(|e| e.to_string())?;
-        log::debug!("scanning {} files", archive.len());
-        ModIndex::from_zip(&mut archive, source_spec).map_err(|e| e.to_string())
-    }
-
-    pub fn from_zip<'a, R: std::io::Read + std::io::Seek>(
-        zip: &mut ZipArchive<R>,
-        source_spec: &'a Tree,
-    ) -> Result<ModIndex<'a>, String> {
-        use std::{collections::HashMap, io::Read};
-
-        let mut mods = HashMap::<ModId, Mod>::new();
-        for file_number in 0..zip.len() {
-            let mut item = zip.by_index(file_number).map_err(|e| e.to_string())?;
-
-            let prefix = format!("{}-{}/mods/", source_spec.name, source_spec.rev);
-            if !item.is_file() || !item.name().starts_with(&prefix) {
-                continue;
-            }
-
-            let mut buffer: Vec<u8> = Vec::new();
-            let _bytes_read = item.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
-
-            let path = item.name().trim_start_matches(&prefix);
-            let parts = path.split('/').collect::<Vec<_>>();
-            let mod_id = ModId((*parts.first().ok_or("path is not pathing")?).to_string());
-            let the_mod = mods.entry(mod_id).or_default();
-
-            match *parts.get(1).ok_or("sub-path is not pathing")? {
-                "meta.json" => {
-                    the_mod.meta = ModMeta::from_slice(&buffer)
-                        .map_err(|e| format!("couldn't parse mod meta for {}: {e}", parts[0]))?;
-                }
-                "description.md" => {
-                    the_mod.description = Some(String::from_utf8_lossy(&buffer).to_string());
-                }
-                #[cfg(feature = "lfs")]
-                "thumbnail.jpg" | "thumbnail.png" => {
-                    the_mod.thumbnail = Some(lfs::Blob {
-                        pointer: lfs::parse_pointer(&String::from_utf8_lossy(&buffer))
-                            .map_err(|e| format!("couldn't parse lfs pointer: {e}"))?,
-                        url: None,
-                        data: Err("no download attempts yet".into()),
-                        tree: source_spec,
-                    });
-                }
-                _ => {}
-            }
-        }
-
-        Ok(ModIndex {
-            mods: mods.into_iter().collect::<Vec<_>>(),
-            repo: source_spec,
-        })
     }
 }
