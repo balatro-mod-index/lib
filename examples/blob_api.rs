@@ -7,7 +7,7 @@ use env_logger::Env;
 const CONCURRENCY_FACTOR: usize = 50;
 
 const PAGE_SIZE: usize = 5;
-const PAGES_TO_FETCH: usize = 20;
+const PAGES_TO_FETCH: usize = 4;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
