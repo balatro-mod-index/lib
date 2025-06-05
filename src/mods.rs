@@ -6,7 +6,7 @@ use crate::lfs;
 #[cfg(feature = "zip")]
 use zip::ZipArchive;
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq, Debug, Default)]
 pub struct ModId(pub String);
 impl fmt::Display for ModId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -33,6 +33,7 @@ pub struct Mod {
     pub description: Option<String>,
 }
 
+#[derive(Clone, Debug, Default)]
 pub struct ModIndex<'tree> {
     #[cfg(feature = "lfs")]
     pub mods: Vec<(ModId, Mod<'tree>)>,
