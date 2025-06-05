@@ -140,6 +140,26 @@ impl std::str::FromStr for ModMeta {
 #[cfg(feature = "zip")]
 #[allow(clippy::missing_errors_doc)]
 impl ModIndex<'_> {
+    #[cfg(feature = "reqwest")]
+    #[allow(clippy::missing_errors_doc)]
+    pub async fn from_reqwest<'a>(
+        reqwest: &reqwest::Client,
+        source_spec: &'a Tree<'a>,
+    ) -> Result<ModIndex<'a>, String> {
+        let url = format!(
+            "https://{}/{}/{}/archive/refs/heads/{}.zip",
+            source_spec.hostname, source_spec.namespace, source_spec.name, source_spec.rev
+        );
+        let response = reqwest.get(&url).send().await.map_err(|e| e.to_string())?;
+
+        let zip = response.bytes().await.map_err(|e| e.to_string())?;
+        log::info!("downloaded zip file {url}");
+
+        let mut archive = ZipArchive::new(std::io::Cursor::new(zip)).map_err(|e| e.to_string())?;
+        log::debug!("scanning {} files", archive.len());
+        ModIndex::from_zip(&mut archive, source_spec).map_err(|e| e.to_string())
+    }
+
     pub fn from_zip<'a, R: std::io::Read + std::io::Seek>(
         zip: &mut ZipArchive<R>,
         source_spec: &'a Tree,
@@ -190,24 +210,4 @@ impl ModIndex<'_> {
             repo: source_spec,
         })
     }
-}
-
-#[cfg(all(feature = "reqwest", feature = "zip"))]
-#[allow(clippy::missing_errors_doc)]
-pub async fn from_reqwest<'a>(
-    reqwest: &reqwest::Client,
-    source_spec: &'a Tree<'a>,
-) -> Result<ModIndex<'a>, String> {
-    let url = format!(
-        "https://{}/{}/{}/archive/refs/heads/{}.zip",
-        source_spec.hostname, source_spec.namespace, source_spec.name, source_spec.rev
-    );
-    let response = reqwest.get(&url).send().await.map_err(|e| e.to_string())?;
-
-    let zip = response.bytes().await.map_err(|e| e.to_string())?;
-    log::info!("downloaded zip file {url}");
-
-    let mut archive = ZipArchive::new(std::io::Cursor::new(zip)).map_err(|e| e.to_string())?;
-    log::debug!("scanning {} files", archive.len());
-    ModIndex::from_zip(&mut archive, source_spec).map_err(|e| e.to_string())
 }

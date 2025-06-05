@@ -1,6 +1,6 @@
 // cargo run --features reqwest --example blob_api
 
-use balatro_mod_index::{github::Tree, mods};
+use balatro_mod_index::{github::Tree, mods::ModIndex};
 
 use env_logger::Env;
 
@@ -16,8 +16,8 @@ async fn main() -> Result<(), String> {
     let reqwest = reqwest::Client::new();
     let index_repo = Tree::default();
 
-    log::info!("fetching index");
-    let mut index = mods::from_reqwest(&reqwest, &index_repo).await?;
+    log::info!("fetching index...");
+    let mut index = ModIndex::from_reqwest(&reqwest, &index_repo).await?;
     let mods = &mut index.mods;
     mods.sort_by(|(_, a), (_, b)| a.meta.title.cmp(&b.meta.title));
     mods.sort_by(|(_, a), (_, b)| b.meta.last_updated.cmp(&a.meta.last_updated));
