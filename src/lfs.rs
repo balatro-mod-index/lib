@@ -10,7 +10,7 @@ pub struct Blob<'tree> {
     pub pointer: Pointer,
     pub url: Option<String>,
     pub data: Result<bytes::Bytes, String>,
-    pub tree: &'tree crate::github::Tree<'tree>,
+    pub tree: &'tree crate::forge::Tree<'tree>,
 }
 
 #[derive(serde::Serialize)]

@@ -1,4 +1,4 @@
-pub mod github;
+pub mod forge;
 pub mod mods;
 
 #[cfg(feature = "lfs")]

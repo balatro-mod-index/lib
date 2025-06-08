@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::github::Tree;
+use crate::forge::Tree;
 #[cfg(feature = "lfs")]
 use crate::lfs;
 #[cfg(feature = "zip")]
@@ -50,12 +50,20 @@ impl ModIndex<'_> {
     #[allow(clippy::missing_errors_doc)]
     pub async fn from_reqwest<'a>(
         reqwest: &reqwest::Client,
-        source_spec: &'a Tree<'a>,
+        tree: &'a Tree<'a>,
     ) -> Result<ModIndex<'a>, String> {
-        let url = format!(
-            "https://{}/{}/{}/archive/refs/heads/{}.zip",
-            source_spec.hostname, source_spec.namespace, source_spec.name, source_spec.rev
-        );
+        use crate::forge::Forge::{GitHub, GitLab};
+
+        let url = match tree.forge {
+            GitHub => format!(
+                "https://{}/{}/{}/archive/refs/heads/{}.zip",
+                tree.hostname, tree.namespace, tree.name, tree.rev
+            ),
+            GitLab => format!(
+                "https://{}/api/v4/projects/{}%2F{}/repository/archive.zip?include_lfs_blobs=false&sha={}",
+                tree.hostname, tree.namespace, tree.name, tree.rev
+            ),
+        };
         let response = reqwest.get(&url).send().await.map_err(|e| e.to_string())?;
 
         let zip = response.bytes().await.map_err(|e| e.to_string())?;
@@ -63,29 +71,34 @@ impl ModIndex<'_> {
 
         let mut archive = ZipArchive::new(std::io::Cursor::new(zip)).map_err(|e| e.to_string())?;
         log::debug!("scanning {} files", archive.len());
-        ModIndex::from_zip(&mut archive, source_spec).map_err(|e| e.to_string())
+        ModIndex::from_zip(&mut archive, tree).map_err(|e| e.to_string())
     }
 
     pub fn from_zip<'a, R: std::io::Read + std::io::Seek>(
         zip: &mut ZipArchive<R>,
-        source_spec: &'a Tree,
+        tree: &'a Tree,
     ) -> Result<ModIndex<'a>, String> {
         use std::{collections::HashMap, io::Read};
 
         let mut mods = HashMap::<ModId, Mod>::new();
         for file_number in 0..zip.len() {
             let mut item = zip.by_index(file_number).map_err(|e| e.to_string())?;
+            let prefix = format!("{}-{}", tree.name, tree.rev);
 
-            let prefix = format!("{}-{}/mods/", source_spec.name, source_spec.rev);
-            if !item.is_file() || !item.name().starts_with(&prefix) {
+            let parts = item.name().split('/');
+            if !item.is_file()
+                || !matches!(
+                    parts.take(2).collect::<Vec<_>>().as_slice(),
+                    [first, "mods"] if first.starts_with(&prefix)
+                )
+            {
                 continue;
             }
 
             let mut buffer: Vec<u8> = Vec::new();
             let _bytes_read = item.read_to_end(&mut buffer).map_err(|e| e.to_string())?;
 
-            let path = item.name().trim_start_matches(&prefix);
-            let parts = path.split('/').collect::<Vec<_>>();
+            let parts = item.name().split('/').skip(2).collect::<Vec<_>>();
             let mod_id = ModId((*parts.first().ok_or("path is not pathing")?).to_string());
             let the_mod = mods.entry(mod_id).or_default();
 
@@ -104,7 +117,7 @@ impl ModIndex<'_> {
                             .map_err(|e| format!("couldn't parse lfs pointer: {e}"))?,
                         url: None,
                         data: Err("no download attempts yet".into()),
-                        tree: source_spec,
+                        tree,
                     });
                 }
                 _ => {}
@@ -113,7 +126,7 @@ impl ModIndex<'_> {
 
         Ok(ModIndex {
             mods: mods.into_iter().collect::<Vec<_>>(),
-            repo: source_spec,
+            repo: tree,
         })
     }
 }

@@ -1,6 +1,6 @@
 // cargo run --features reqwest --example blob_api
 
-use balatro_mod_index::{github::Tree, mods::ModIndex};
+use balatro_mod_index::{forge::Tree, mods::ModIndex};
 
 use env_logger::Env;
 
