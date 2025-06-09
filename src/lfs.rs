@@ -77,17 +77,23 @@ pub async fn mut_fetch_download_urls(
     concurrency_factor: usize,
     refresh_available: bool,
 ) -> Result<(), String> {
-    use futures::{StreamExt, stream};
+    use futures::{StreamExt, stream::FuturesUnordered};
     use std::cmp::min;
 
     let tree = blobs.first().ok_or("no blobs to fetch")?.tree;
+
     let pointers = if refresh_available {
-        blobs.iter().map(|b| &b.pointer).collect::<Vec<_>>()
+        blobs
+            .iter()
+            .enumerate()
+            .map(|(i, b)| (i, b.pointer.clone()))
+            .collect::<Vec<_>>()
     } else {
         blobs
             .iter()
-            .filter(|b| b.url.is_none())
-            .map(|b| &b.pointer)
+            .enumerate()
+            .filter(|(_, b)| b.url.is_none())
+            .map(|(i, b)| (i, b.pointer.clone()))
             .collect::<Vec<_>>()
     };
 
@@ -99,6 +105,7 @@ pub async fn mut_fetch_download_urls(
     log::debug!("fetching lfs info for {} blobs", pointers.len());
 
     let mut tasks = Vec::new();
+    let mut results = Vec::<Result<Vec<(usize, String)>, String>>::new();
 
     let mut offset = 0;
     while offset < pointers.len() {
@@ -110,6 +117,7 @@ pub async fn mut_fetch_download_urls(
         let next = offset + count;
 
         let batch = &pointers[offset..next];
+        let objects = batch.iter().map(|(_, p)| p).collect::<Vec<_>>();
 
         let future = async move {
             log::debug!("getting lfs object info at offset {offset}");
@@ -120,7 +128,7 @@ pub async fn mut_fetch_download_urls(
                 ))
                 .json(&BatchRequest {
                     operation: String::from("download"),
-                    objects: batch,
+                    objects: &objects,
                 })
                 .header("Accept", "application/vnd.git-lfs+json")
                 .header("Content-Type", "application/vnd.git-lfs+json")
@@ -134,7 +142,7 @@ pub async fn mut_fetch_download_urls(
                 .map_err(|e| format!("couldn't read raw response: {e}"))?
                 .to_vec();
 
-            let data: BatchResponse = serde_json::from_slice(&data)
+            let data = serde_json::from_slice::<BatchResponse>(&data)
                 .map_err(|_| match String::from_utf8(data) {
                     Ok(s) => format!("response was not json, but a string: {s}"),
                     Err(e) => format!("response was not json, and not a valid utf-8 string: {e}"),
@@ -144,7 +152,8 @@ pub async fn mut_fetch_download_urls(
             Ok(data
                 .objects
                 .into_iter()
-                .map(|obj| obj.actions.download.href)
+                .enumerate()
+                .map(|(i, obj)| (batch[i].0, obj.actions.download.href))
                 .collect::<Vec<_>>())
         };
         tasks.push(future);
@@ -152,10 +161,20 @@ pub async fn mut_fetch_download_urls(
         offset = next;
     }
 
-    let download_urls = stream::iter(tasks)
-        .buffer_unordered(concurrency_factor)
-        .collect::<Vec<Result<Vec<String>, String>>>()
-        .await
+    let mut futures = FuturesUnordered::new();
+    while let Some(next_job) = tasks.pop() {
+        while futures.len() >= concurrency_factor {
+            if let Some(result) = futures.next().await {
+                results.push(result);
+            }
+        }
+        futures.push(next_job);
+    }
+    while let Some(result) = futures.next().await {
+        results.push(result);
+    }
+
+    let download_urls = results
         .into_iter()
         .map(Result::ok)
         .try_fold(Vec::new(), |mut acc, result| {
@@ -164,8 +183,8 @@ pub async fn mut_fetch_download_urls(
         })
         .ok_or("couldn't fetch download urls")?;
 
-    for (blob, url) in blobs.iter_mut().zip(download_urls) {
-        blob.url = Some(url);
+    for (i, url) in download_urls {
+        blobs[i].url = Some(url);
     }
 
     Ok(())
@@ -177,16 +196,37 @@ pub async fn mut_fetch_blobs(
     client: &reqwest::Client,
     concurrency_factor: usize,
 ) -> Result<(), String> {
-    use futures::{StreamExt, stream};
+    use futures::{StreamExt, stream::FuturesUnordered};
 
-    stream::iter(blobs.iter_mut().filter_map(|b| {
-        b.url.as_ref().map(|url| async {
-            b.data = fetch_one(client, url, &b.pointer.oid).await;
+    let mut tasks = blobs
+        .iter()
+        .enumerate()
+        .filter_map(|(i, b)| {
+            b.url
+                .as_ref()
+                .map(|url| async move { (i, fetch_one(client, url, &b.pointer.oid.clone()).await) })
         })
-    }))
-    .buffer_unordered(concurrency_factor)
-    .collect::<Vec<_>>()
-    .await;
+        .collect::<Vec<_>>();
+
+    let mut futures = FuturesUnordered::new();
+    let mut results = Vec::new();
+    while let Some(next_job) = tasks.pop() {
+        while futures.len() >= concurrency_factor {
+            if let Some(result) = futures.next().await {
+                results.push(result);
+            }
+        }
+        futures.push(next_job);
+    }
+    while let Some(result) = futures.next().await {
+        results.push(result);
+    }
+    drop(tasks);
+    drop(futures);
+
+    for (i, data) in results {
+        blobs[i].data = data;
+    }
 
     Ok(())
 }
