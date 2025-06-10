@@ -189,7 +189,7 @@ impl ModIndex<'_> {
             .collect::<Vec<_>>();
 
         lfs::mut_fetch_download_urls(blobs, client, concurrency_factor, refresh_urls).await?;
-        lfs::mut_fetch_blobs(blobs, client, concurrency_factor).await?;
+        lfs::mut_fetch_blobs(blobs, client, concurrency_factor).await;
 
         Ok(next)
     }
