@@ -72,7 +72,7 @@ impl ModIndex<'_> {
         let response = reqwest.get(&url).send().await.map_err(|e| e.to_string())?;
 
         let zip = response.bytes().await.map_err(|e| e.to_string())?;
-        log::info!("downloaded zip file {url}");
+        log::debug!("downloaded zip file {url}");
 
         let mut archive = ZipArchive::new(std::io::Cursor::new(zip)).map_err(|e| e.to_string())?;
         log::debug!("scanning {} files", archive.len());
