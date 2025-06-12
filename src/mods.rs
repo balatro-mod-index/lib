@@ -18,6 +18,11 @@ impl Clone for ModId {
         ModId(self.0.clone())
     }
 }
+impl PartialEq<str> for ModId {
+    fn eq(&self, other: &str) -> bool {
+        self.0 == other
+    }
+}
 
 #[cfg(feature = "lfs")]
 #[derive(Clone, Default, Debug)]
