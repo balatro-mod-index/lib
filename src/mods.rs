@@ -213,7 +213,8 @@ pub struct ModMeta {
     pub download_url: String,
     #[serde(rename = "folderName")]
     pub folder_name: Option<String>,
-    pub version: Option<String>,
+    #[serde(default)] // TODO: remove this when `skyline69/balatro-mod-index#274` is merged
+    pub version: String,
     #[serde(default)]
     pub automatic_version_check: bool,
     pub last_updated: Option<u64>,
