@@ -203,7 +203,9 @@ impl ModIndex<'_> {
 #[derive(Clone, Debug, Default, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ModMeta {
+    #[serde(default)]
     pub requires_steamodded: bool,
+    #[serde(default)]
     pub requires_talisman: bool,
     pub categories: Vec<String>,
     pub author: String,
@@ -213,7 +215,6 @@ pub struct ModMeta {
     pub download_url: String,
     #[serde(rename = "folderName")]
     pub folder_name: Option<String>,
-    #[serde(default)] // TODO: remove this when `skyline69/balatro-mod-index#274` is merged
     pub version: String,
     #[serde(default)]
     pub automatic_version_check: bool,

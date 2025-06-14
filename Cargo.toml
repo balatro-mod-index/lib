@@ -1,7 +1,7 @@
 [package]
 name = "balatro_mod_index"
 description = "a library for parsing a git lfs repo into a BMM-compatible index"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 license = "GPL-3.0-only"
 exclude = [".gitignore", "flake.*"]
