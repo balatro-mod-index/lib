@@ -11,10 +11,9 @@ async fn main() -> Result<(), String> {
     env_logger::Builder::from_env(Env::new().default_filter_or("info")).init();
 
     let reqwest = reqwest::Client::new();
-    let index_repo = forge::Tree::default();
 
     log::info!("fetching index...");
-    let mut index = ModIndex::from_reqwest(&reqwest, &index_repo).await?;
+    let mut index = ModIndex::from_reqwest(&reqwest, <&forge::Tree>::default()).await?;
 
     // fetch all thumbnail download urls at once
     index
