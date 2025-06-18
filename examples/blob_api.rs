@@ -1,6 +1,9 @@
 // cargo run --features reqwest --example blob_api
 
-use balatro_mod_index::{forge::Tree, mods::ModIndex};
+use balatro_mod_index::{
+    forge::{self},
+    mods::ModIndex,
+};
 
 use env_logger::Env;
 
@@ -14,7 +17,7 @@ async fn main() -> Result<(), String> {
     env_logger::Builder::from_env(Env::new().default_filter_or("info")).init();
 
     let reqwest = reqwest::Client::new();
-    let index_repo = Tree::default();
+    let index_repo = forge::Tree::default();
 
     log::info!("fetching index...");
     let mut index = ModIndex::from_reqwest(&reqwest, &index_repo).await?;
@@ -22,7 +25,7 @@ async fn main() -> Result<(), String> {
     mods.sort_by(|(_, a), (_, b)| a.meta.title.cmp(&b.meta.title));
     mods.sort_by(|(_, a), (_, b)| b.meta.last_updated.cmp(&a.meta.last_updated));
 
-    // fetch all download urls at once
+    // fetch all thumbnail download urls at once
     index
         .mut_fetch_blob_urls(&reqwest, CONCURRENCY_FACTOR, 0, index.mods.len(), false)
         .await?;
@@ -36,12 +39,11 @@ async fn main() -> Result<(), String> {
             .mut_fetch_blobs(&reqwest, CONCURRENCY_FACTOR, offset, PAGE_SIZE, false)
             .await?;
 
-        for (mod_id, mod_data) in index.mods.iter().skip(offset).take(PAGE_SIZE) {
+        for (id, m) in index.mods.iter().skip(offset).take(PAGE_SIZE) {
             log::info!(
-                "{mod_id}: last updated at {} has {}",
-                mod_data.meta.last_updated.unwrap_or_default(),
-                mod_data
-                    .thumbnail
+                "{id}: last updated at {} has {}",
+                m.meta.last_updated.unwrap_or_default(),
+                m.thumbnail
                     .as_ref()
                     .map_or("no thumbnail".to_string(), |t| format!(
                         "thumbnail of size {}",
