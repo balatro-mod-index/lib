@@ -30,7 +30,7 @@ async fn main() -> Result<(), String> {
                 "Breezebuilder@SystemClock", // has no update timestamp
                 "MathIsFun0@Talisman",       // has no thumbnail
             ]
-            .contains(&id.to_string().as_str())
+            .contains(&id.as_str())
         })
         .collect::<Vec<_>>();
 

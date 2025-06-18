@@ -23,6 +23,12 @@ impl PartialEq<str> for ModId {
         self.0 == other
     }
 }
+impl ModId {
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
 
 #[cfg(feature = "lfs")]
 #[derive(Clone, Default, Debug)]
