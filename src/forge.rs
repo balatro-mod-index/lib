@@ -24,7 +24,7 @@ impl Default for Tree<'_> {
         }
     }
 }
-static DEFAULT_TREE: LazyLock<Tree> = LazyLock::new(Tree::default);
+static DEFAULT_TREE: LazyLock<Tree<'_>> = LazyLock::new(Tree::default);
 impl Default for &Tree<'_> {
     fn default() -> Self {
         &DEFAULT_TREE

@@ -1,5 +1,3 @@
-#![allow(clippy::missing_errors_doc)]
-
 #[derive(PartialEq, Eq, Hash, Default, Debug, Clone, serde::Serialize)]
 pub struct Pointer {
     pub oid: String,
@@ -13,7 +11,7 @@ pub struct Blob<'tree> {
     pub tree: &'tree crate::forge::Tree<'tree>,
 }
 
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize)]
 pub struct BatchRequest<'pointers> {
     pub operation: String,
     pub objects: &'pointers [&'pointers Pointer],

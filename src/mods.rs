@@ -9,7 +9,7 @@ use zip::ZipArchive;
 #[derive(Eq, Hash, PartialEq, Debug, Default)]
 pub struct ModId(pub String);
 impl fmt::Display for ModId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -26,10 +26,10 @@ impl PartialEq<str> for ModId {
 
 #[cfg(feature = "lfs")]
 #[derive(Clone, Default, Debug)]
-pub struct Mod<'blob> {
+pub struct Mod<'tree> {
     pub meta: ModMeta,
     pub description: Option<String>,
-    pub thumbnail: Option<lfs::Blob<'blob>>,
+    pub thumbnail: Option<lfs::Blob<'tree>>,
 }
 #[cfg(not(feature = "lfs"))]
 #[derive(Clone, Default, Debug)]
@@ -81,11 +81,13 @@ impl ModIndex<'_> {
 
     pub fn from_zip<'a, R: std::io::Read + std::io::Seek>(
         zip: &mut ZipArchive<R>,
-        tree: &'a Tree,
+        tree: &'a Tree<'_>,
     ) -> Result<ModIndex<'a>, String> {
         use std::{collections::HashMap, io::Read};
 
+        #[allow(elided_lifetimes_in_paths)] // to work with or without `lfs` feature
         let mut mods = HashMap::<ModId, Mod>::new();
+
         for file_number in 0..zip.len() {
             let mut item = zip.by_index(file_number).map_err(|e| e.to_string())?;
             let prefix = format!("{}-{}", tree.name, tree.rev);
